@@ -31,6 +31,10 @@ int main(int argc, char **argv) {
                 << client->peerAddress().toString()
                 << "port"
                 << client->peerPort();
+
+        QObject::connect(client, &QWebSocket::textMessageReceived, client, [](const QString &message) {
+            qInfo().noquote() << "Received:" << message;
+        });
         
         QObject::connect(client, &QWebSocket::disconnected, client, [client]() {
             qInfo() << "Client disconnected";

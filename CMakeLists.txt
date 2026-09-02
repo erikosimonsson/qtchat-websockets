@@ -5,7 +5,7 @@ project(QtChatWebSockets VERSION 0.1 LANGUAGES CXX)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-find_package(Qt6 REQUIRED COMPONENTS Core WebSockets)
+find_package(Qt6 REQUIRED COMPONENTS Core WebSockets Widgets)
 
 qt_add_executable(chat-server
     server/main.cpp
@@ -13,5 +13,14 @@ qt_add_executable(chat-server
 
 target_link_libraries(chat-server PRIVATE
     Qt6::Core
+    Qt6::WebSockets
+)
+
+qt_add_executable(chat-client
+    client/main.cpp
+)
+
+target_link_libraries(chat-client PRIVATE
+    Qt6::Widgets
     Qt6::WebSockets
 )
