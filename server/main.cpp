@@ -1,6 +1,7 @@
 #include <QCoreApplication>
 #include <QDebug>
 #include <QHostAddress>
+#include <QtWebSockets/QWebSocket>
 #include <QtWebSockets/QWebSocketServer>
 
 int main(int argc, char **argv) {
@@ -18,6 +19,24 @@ int main(int argc, char **argv) {
     }
 
     qInfo().noquote() << QStringLiteral("Chat server listening at ws://127.0.0.1:%1").arg(server.serverPort());
+
+    QObject::connect(&server, &QWebSocketServer::newConnection, [&server]() {
+        QWebSocket *client = server.nextPendingConnection();
+
+        if (client == nullptr) {
+            return;
+        }
+
+        qInfo() << "Client connected from"
+                << client->peerAddress().toString()
+                << "port"
+                << client->peerPort();
+        
+        QObject::connect(client, &QWebSocket::disconnected, client, [client]() {
+            qInfo() << "Client disconnected";
+            client->deleteLater();
+        });
+    });
 
     return application.exec();
 }
