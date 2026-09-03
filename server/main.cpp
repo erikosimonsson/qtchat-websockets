@@ -40,42 +40,73 @@ int main(int argc, char **argv) {
 
         QObject::connect(client, &QWebSocket::textMessageReceived, client, [client, &clientsById, &idsByClient](const QString &message) {
             const QJsonDocument document = QJsonDocument::fromJson(message.toUtf8());
-            const QJsonObject request = document.object();
-            const QString messageType = request.value(QStringLiteral("type")).toString();
-            const QString clientId = request.value(QStringLiteral("clientId")).toString().trimmed();
-
-            QJsonObject response;
-            response[QStringLiteral("type")] = QStringLiteral("registration");
-
-            if (!document.isObject() || messageType != QStringLiteral("register") || clientId.isEmpty() || idsByClient.contains(client) || clientsById.contains(clientId)) {
-                response[QStringLiteral("status")] = QStringLiteral("rejected");
-            } else {
-                clientsById.insert(clientId, client);
-                idsByClient.insert(client, clientId);
-
-                response[QStringLiteral("status")] = QStringLiteral("accepted");
-                qInfo() << "Registered client:" << clientId;
+            
+            if (!document.isObject()) {
+                return;
             }
 
-            const QByteArray json = QJsonDocument(response).toJson(QJsonDocument::Compact);
+            const QJsonObject request = document.object();
+            const QString messageType = request.value(QStringLiteral("type")).toString();
+            
+            if (messageType == QStringLiteral("register")) {
+                const QString requestedId = request.value(QStringLiteral("clientId")).toString().trimmed();
+                QJsonObject response;
+                response[QStringLiteral("type")] = QStringLiteral("registration");
 
-            client->sendTextMessage(QString::fromUtf8(json));
+                if (requestedId.isEmpty() || idsByClient.contains(client) || clientsById.contains(requestedId)) {
+                    response[QStringLiteral("status")] = QStringLiteral("rejected");
+                } else {
+                    clientsById.insert(requestedId, client);
+                    idsByClient.insert(client, requestedId);
+
+                    response[QStringLiteral("status")] = QStringLiteral("accepted");
+
+                    qInfo() << "Registered client:" << requestedId;
+                }
+
+                const QByteArray json = QJsonDocument(response).toJson(QJsonDocument::Compact);
+                client->sendTextMessage(QString::fromUtf8(json));
+                return;
+            }
+
+            if (messageType == QStringLiteral("chat")) {
+                if (!idsByClient.contains(client)) {
+                    qWarning() << "Ignoring message from unregistered client";
+                    return;
+                }
+
+                const QString chatText = request.value(QStringLiteral("message")).toString().trimmed();
+                if (chatText.isEmpty()) {
+                    return;
+                }
+
+                const QString senderId = idsByClient.value(client);
+
+                QJsonObject outgoingMessage;
+                outgoingMessage[QStringLiteral("type")] = QStringLiteral("chat");
+                outgoingMessage[QStringLiteral("senderId")] = senderId;
+                outgoingMessage[QStringLiteral("message")] = chatText;
+
+                const QString outgoingJson = QString::fromUtf8(QJsonDocument(outgoingMessage).toJson(QJsonDocument::Compact));
+
+                for (QWebSocket *recipient : clientsById) {
+                    recipient->sendTextMessage(outgoingJson);
+                }
+
+                qInfo() << "Broadcast message from:" << senderId;
+            }
         });
         
         QObject::connect(client, &QWebSocket::disconnected, client, [client, &clientsById, &idsByClient]() {
             const QString clientId = idsByClient.take(client);
 
             if (!clientId.isEmpty()) {
-                const QString clientId = idsByClient.take(client);
-
-                if (!clientId.isEmpty()) {
-                    clientsById.remove(clientId);
-                    qInfo() << "Removed client:" << clientId;
-                }
-
-                qInfo() << "Client disconnected";
-                client->deleteLater();
+                clientsById.remove(clientId);
+                qInfo() << "Removed client:" << clientId;
             }
+
+            qInfo() << "Client disconnected";
+            client->deleteLater();
         });
     });
 
