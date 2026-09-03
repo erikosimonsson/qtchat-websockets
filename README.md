@@ -1,2 +1,3 @@
 # qtchat-websockets
-Project in which one chat client can send messages to all other chat clients conntected to a websocket "server"
+Chat tool where one chat client can send messages to all other chat clients connected to a websocket server (localhost only)
+Written with C++ and Qt
